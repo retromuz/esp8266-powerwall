@@ -1,0 +1,63 @@
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+@
+viewport {
+	width: device-width;
+	zoom: 1.0;
+}
+
+span {
+	font-size: 22px !important;
+}
+</style>
+<link rel="stylesheet"
+	href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"></link>
+<script
+	src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+<script
+	src="https://cdnjs.cloudflare.com/ajax/libs/svg.js/3.0.16/svg.min.js"
+	integrity="sha256-MCvBrhCuX8GNt0gmv06kZ4jGIi1R2QNaSkadjRzinFs="
+	crossorigin="anonymous"></script>
+<script src="/index.js"></script>
+</head>
+<body>
+	<cells></cells>
+	<hr></hr>
+	<h3>Summary</h3>
+	<div class="summary"></div>
+	<hr></hr>
+	<h3>MPPT Settings</h3>
+	<div class="settings">
+		<div class="switch">
+			<span>Auto: </span>
+			<label>OFF <input type="checkbox" id="s-auto-mppt" class="s-auto-mppt"> <span
+				class="lever"></span> ON</label>
+		</div>
+		<div>
+			<span>PWM: </span><span class="_i_p"></span>
+		</div>
+		<div>
+			<span>Input ADC: </span><span class="_i_r"></span>
+		</div>
+		<div>
+			<span>Target Input ADC: </span><span class="_ti_r"></span>
+		</div>
+		<div>
+			<label><span>Set Target Input ADC: </span><input
+				type="number" class="_ti_w" /></label>
+		</div>
+		<div>
+			<span>Output ADC: </span><span class="_o_r"></span>
+		</div>
+		<div>
+			<span>Target Output ADC: </span><span class="_to_r"></span>
+		</div>
+		<div>
+			<label><span>Set Target Output ADC: </span><input
+				type="number" class="_to_w" /></label>
+		</div>
+	</div>
+</body>
+</html>
