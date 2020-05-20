@@ -8,10 +8,20 @@ Ticker ticker;
 volatile unsigned int ticks = 0;
 volatile unsigned long int epochWiFi = 0;
 
-volatile bool mppt = false;
 volatile unsigned long int epochMppt = 0;
+volatile unsigned long int epochI2C = 0;
+
+volatile int tiav = 0;
+volatile int iav = 0;
+volatile int toav = 0;
+volatile int oav = 0;
+volatile int pwm = -1;
+volatile bool autoMppt = true;
 
 MPPTData mpptData;
+
+HTTPClient http;
+WiFiClient wifi;
 
 void ISRwatchdog() {
 	if (++ticks > 30) {
@@ -42,6 +52,9 @@ void setup(void) {
 	}
 	Wire.setClock(100000);
 	Wire.begin();
+	initMpptData();
+	epochMppt = timeClient.getEpochTime();
+	epochI2C = timeClient.getEpochTime();
 }
 
 void loop(void) {
@@ -49,6 +62,7 @@ void loop(void) {
 	ArduinoOTA.handle();
 	if (timeClient.getEpochTime() - epochWiFi > 20) {
 		Serial.println("Checking WiFi connectivity.");
+		Serial.println(WiFi.status());
 		epochWiFi = timeClient.getEpochTime();
 		if (!WiFi.isConnected()) {
 			Serial.println("WiFi reconnecting...");
@@ -57,19 +71,129 @@ void loop(void) {
 			setupWiFi();
 		}
 	}
-	if (mppt && timeClient.getEpochTime() - epochMppt > 2) {
-		HTTPClient http;
-		WiFiClient wifi;
-		if (http.begin(wifi, "http://bms.karunadheera.com/c")) {
-			int code = http.GET();
-			if (code == 200) {
-
-			} else {
-				Serial.print("error http code: ");
-				Serial.println(code);
-			}
+	if (WiFi.isConnected() && autoMppt
+			&& timeClient.getEpochTime() - epochMppt > 6) {
+		epochMppt = timeClient.getEpochTime();
+		if (mpptData.status == 3) {
+			analyseMpptData();
+			initMpptData();
+		} else {
+			buildMpptData();
 		}
 	}
+	if (timeClient.getEpochTime() - epochI2C > 1) {
+		readI2CSlave();
+	}
+}
+
+void readI2CSlave() {
+	uint8_t buf[2];
+	Wire.beginTransmission(SLAVE_I2C_ADDR);
+	Wire.write(SLAVE_I2C_CMD_READ_TARGET_INPUT_ADC_VAL);
+	Wire.endTransmission();
+	if (Wire.requestFrom(SLAVE_I2C_ADDR, 2)) {
+		Wire.readBytes(buf, 2);
+		tiav = buf[0] | buf[1] << 8;
+	}
+	Wire.beginTransmission(SLAVE_I2C_ADDR);
+	Wire.write(SLAVE_I2C_CMD_READ_TARGET_OUTPUT_ADC_VAL);
+	Wire.endTransmission();
+	if (Wire.requestFrom(SLAVE_I2C_ADDR, 2)) {
+		Wire.readBytes(buf, 2);
+		toav = buf[0] | buf[1] << 8;
+	}
+	Wire.beginTransmission(SLAVE_I2C_ADDR);
+	Wire.write(SLAVE_I2C_CMD_READ_INPUT_ADC_VAL);
+	Wire.endTransmission();
+	if (Wire.requestFrom(SLAVE_I2C_ADDR, 2)) {
+		Wire.readBytes(buf, 2);
+		iav = buf[0] | buf[1] << 8;
+	}
+	Wire.beginTransmission(SLAVE_I2C_ADDR);
+	Wire.write(SLAVE_I2C_CMD_READ_OUTPUT_ADC_VAL);
+	Wire.endTransmission();
+	if (Wire.requestFrom(SLAVE_I2C_ADDR, 2)) {
+		Wire.readBytes(buf, 2);
+		oav = buf[0] | buf[1] << 8;
+	}
+	Wire.beginTransmission(SLAVE_I2C_ADDR);
+	Wire.write(SLAVE_I2C_CMD_READ_PWM_VAL);
+	Wire.endTransmission();
+	if (Wire.requestFrom(SLAVE_I2C_ADDR, 1)) {
+		pwm = Wire.read();
+	}
+}
+
+void buildMpptData() {
+	if (http.begin(wifi, "http://bms.karunadheera.com/c")) {
+		int code = http.GET();
+		if (code == 200) {
+			int current = http.getString().toInt();
+			if (current > MIN_CURRENT_FOR_PWM_INIT) {
+				Wire.beginTransmission(SLAVE_I2C_ADDR);
+				Wire.write(SLAVE_I2C_CMD_READ_TARGET_INPUT_ADC_VAL);
+				Wire.endTransmission();
+				if (Wire.requestFrom(SLAVE_I2C_ADDR, 2)) {
+					uint8_t buf[2];
+					Wire.readBytes(buf, 2);
+					int adc = buf[0] | buf[1] << 8;
+					MPPTEntry e;
+					e.current = current;
+					e.inAdc = adc;
+					mpptData.data[mpptData.status++] = e;
+					if (mpptData.status == 1) {
+						adc = adc + MPPT_STEP;
+						writeAdc(adc);
+					} else if (mpptData.status == 2) {
+						adc = adc - (MPPT_STEP * 2);
+						writeAdc(adc);
+					}
+				}
+			} else {
+				initMpptData();
+			}
+		} else {
+			Serial.print("error http code: ");
+			Serial.println(code);
+		}
+		http.end();
+	} else {
+		Serial.println("cannot read bms.karunadheera.com/c");
+	}
+}
+
+void analyseMpptData() {
+	if (mpptData.data[0].current >= mpptData.data[1].current) {
+		if (mpptData.data[0].current >= mpptData.data[2].current) {
+			writeAdc(mpptData.data[0].inAdc);
+			epochMppt = timeClient.getEpochTime() + 10;
+			Serial.print(
+					"current MPPT conditions are the best. revert to inADC: ");
+			Serial.println(mpptData.data[0].inAdc);
+		} else {
+			writeAdc(mpptData.data[2].inAdc);
+			Serial.print("found better MPPT conditions at inADC: ");
+			Serial.println(mpptData.data[2].inAdc);
+		}
+	} else {
+		if (mpptData.data[1].current >= mpptData.data[2].current) {
+			writeAdc(mpptData.data[1].inAdc);
+			Serial.print("found better MPPT conditions at inADC: ");
+			Serial.println(mpptData.data[1].inAdc);
+		} else {
+			writeAdc(mpptData.data[2].inAdc);
+			Serial.print("found better MPPT conditions at inADC: ");
+			Serial.println(mpptData.data[2].inAdc);
+		}
+	}
+}
+
+void writeAdc(int adc) {
+	Wire.beginTransmission(SLAVE_I2C_ADDR);
+	Wire.write(SLAVE_I2C_CMD_WRITE_TARGET_INPUT_ADC_VAL);
+	Wire.write(adc & 0xff);
+	Wire.write((adc & 0xff00) >> 8);
+	Wire.endTransmission();
 }
 
 void initMpptData() {
@@ -114,6 +238,8 @@ bool setupWiFi() {
 			Serial.printf(
 					"firmware properties wifi.ssid: %s; wifi.password: %s\r\n",
 					ssid.c_str(), password.c_str());
+			Serial.printf("Wi-Fi mode set to WIFI_STA %s\r\n",
+					WiFi.mode(WIFI_STA) ? "" : "Failed!");
 			WiFi.begin(ssid, password);
 
 			Serial.printf("Connecting");
@@ -143,68 +269,9 @@ void setupWebServer() {
 	server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request) {
 		request->send(LittleFS, "/favicon.ico");
 	});
-	server.on("/rit", HTTP_GET, [](AsyncWebServerRequest *request) {
-		char out[4];
-		Wire.beginTransmission(SLAVE_I2C_ADDR);
-		Wire.write(SLAVE_I2C_CMD_READ_TARGET_INPUT_ADC_VAL);
-		Wire.endTransmission();
-		if (Wire.requestFrom(SLAVE_I2C_ADDR, 2)) {
-			uint8_t buf[2];
-			Wire.readBytes(buf, 2);
-			sprintf(out, "%d", buf[0] | buf[1] << 8);
-		}
-		request->send_P(200, CONTENT_TYPE_APPLICATION_JSON, out);
-	});
-	server.on("/rot", HTTP_GET, [](AsyncWebServerRequest *request) {
-		char out[4];
-		Wire.beginTransmission(SLAVE_I2C_ADDR);
-		Wire.write(SLAVE_I2C_CMD_READ_TARGET_OUTPUT_ADC_VAL);
-		Wire.endTransmission();
-		if (Wire.requestFrom(SLAVE_I2C_ADDR, 2)) {
-			uint8_t buf[2];
-			Wire.readBytes(buf, 2);
-			sprintf(out, "%d", buf[0] | buf[1] << 8);
-		}
-		request->send_P(200, CONTENT_TYPE_APPLICATION_JSON, out);
-	}
-	);
-	server.on("/ri", HTTP_GET, [](AsyncWebServerRequest *request) {
-		char out[4];
-		Wire.beginTransmission(SLAVE_I2C_ADDR);
-		Wire.write(SLAVE_I2C_CMD_READ_INPUT_ADC_VAL);
-		Wire.endTransmission();
-		if (Wire.requestFrom(SLAVE_I2C_ADDR, 2)) {
-			uint8_t buf[2];
-			Wire.readBytes(buf, 2);
-			sprintf(out, "%d", buf[0] | buf[1] << 8);
-		}
-		request->send_P(200, CONTENT_TYPE_APPLICATION_JSON, out);
-	});
-	server.on("/ro", HTTP_GET, [](AsyncWebServerRequest *request) {
-		char out[4];
-		Wire.beginTransmission(SLAVE_I2C_ADDR);
-		Wire.write(SLAVE_I2C_CMD_READ_OUTPUT_ADC_VAL);
-		Wire.endTransmission();
-		if (Wire.requestFrom(SLAVE_I2C_ADDR, 2)) {
-			uint8_t buf[2];
-			Wire.readBytes(buf, 2);
-			sprintf(out, "%d", buf[0] | buf[1] << 8);
-		}
-		request->send_P(200, CONTENT_TYPE_APPLICATION_JSON, out);
-	});
-	server.on("/rp", HTTP_GET, [](AsyncWebServerRequest *request) {
-		char out[2];
-		Wire.beginTransmission(SLAVE_I2C_ADDR);
-		Wire.write(SLAVE_I2C_CMD_READ_PWM_VAL);
-		Wire.endTransmission();
-		if (Wire.requestFrom(SLAVE_I2C_ADDR, 1)) {
-			sprintf(out, "%d", Wire.read());
-		}
-		request->send_P(200, CONTENT_TYPE_APPLICATION_JSON, out);
-	});
-	server.on("/ra", HTTP_GET, [](AsyncWebServerRequest *request) {
-		char out[2];
-		sprintf(out, "%d", mppt ? 1 : 0);
+	server.on("/r", HTTP_GET, [](AsyncWebServerRequest *request) {
+		char out[280];
+		sprintf(out,"{\"tiav\":%d,\"iav\":%d,\"toav\":%d,\"oav\":%d,\"pwm\":%d,\"autoMppt\":%d}" , tiav, iav, toav, oav, pwm, autoMppt? 1 : 0);
 		request->send_P(200, CONTENT_TYPE_APPLICATION_JSON, out);
 	});
 	server.on("/w", HTTP_POST, [](AsyncWebServerRequest *request) {
@@ -212,7 +279,7 @@ void setupWebServer() {
 			AsyncWebParameter *d = request->getParam("d", true, false);
 			AsyncWebParameter *v = request->getParam("v", true, false);
 			if (d && v && d->value().toInt() == CMD_WRITE_AUTO_MPPT) {
-				mppt = v->value().toInt() != 0;
+				autoMppt = v->value().toInt();
 			} else if (v && d) {
 				int val = v->value().toInt();
 				Serial.println(val);
@@ -238,7 +305,7 @@ void setupWebServer() {
 }
 
 void notFound(AsyncWebServerRequest *request) {
-	request->send(404, "text/plain", "Not found");
+	request->send(LittleFS, "/index.htm");
 }
 
 void setupNTPClient() {

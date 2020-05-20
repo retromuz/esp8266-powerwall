@@ -42,12 +42,15 @@
 
 #define CMD_WRITE_AUTO_MPPT 9
 
+#define MPPT_STEP 10
+#define MIN_CURRENT_FOR_PWM_INIT 100
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 typedef struct {
-	unsigned int pwm;
+	unsigned int inAdc;
 	unsigned int current;
 } MPPTEntry;
 
@@ -58,6 +61,10 @@ typedef struct {
 
 void setupPins();
 void initMpptData();
+void buildMpptData();
+void analyseMpptData();
+void readI2CSlave();
+void writeAdc(int adc);
 bool setupWiFi();
 void setupWebServer();
 void notFound(AsyncWebServerRequest *request);
