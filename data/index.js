@@ -1,20 +1,20 @@
 class Cell {
 
 	constructor(width, height, zoom) {
-		this.RECT_HEIGHT = 143;
-		this.RECT_LOC_X = 64;
-		this.RECT_LOC_Y = 41;
+		this.RECT_HEIGHT = 146;
+		this.RECT_LOC_X = 40;
+		this.RECT_LOC_Y = 40;
 		this.state = 0;
 		this.width = width;
 		this.height = height;
 		this.zoom = zoom;
 		this.balancing = false;
 		this.draw = SVG().size(this.width, this.height);
-		this.outline = this.draw.path('M 370.00,167.00 C 370.00,167.00 375.00,167.00 375.00,167.00 387.50,166.75 394.00,160.00 394.00,146.50 394.00,146.50 393.75,78.25 393.75,78.25 393.56,63.00 389.93,58.07 375.00,58.00 375.00,58.00 370.00,58.00 370.00,58.00 370.00,58.00 370.00,37.00 370.00,37.00 369.96,13.09 353.69,1.27 331.00,1.00 331.00,1.00 236.00,1.00 236.00,1.00 236.00,1.00 66.00,1.00 66.00,1.00 43.43,1.04 25.04,11.12 25.00,36.00 25.00,36.00 25.00,189.00 25.00,189.00 25.03,209.15 38.85,222.97 59.00,223.00 59.00,223.00 111.00,223.00 111.00,223.00 111.00,223.00 336.00,223.00 336.00,223.00 340.92,222.99 343.25,223.05 348.00,221.29 373.59,211.83 370.00,188.71 370.00,167.00 Z');
+		this.outline = this.draw.path('M 1.25,28.75 C 1.25,28.75 1.00,196.25 1.00,196.25 2.25,212.50 19.10,221.58 24.75,221.75 24.75,221.75 326.00,221.50 326.00,221.50 339.75,220.75 347.75,202.00 347.75,192.00 347.75,192.00 347.25,167.25 347.25,167.25 348.75,167.00 360.25,166.50 360.00,166.25 370.50,164.50 370.06,153.51 370.25,153.50 370.25,153.50 369.50,66.25 369.50,66.25 370.84,65.94 368.00,56.75 359.25,57.25 359.25,57.25 347.25,57.50 347.25,57.50 347.25,57.50 346.50,31.50 346.50,31.50 345.25,12.00 332.75,4.25 320.75,1.75 320.75,1.75 31.25,1.50 31.25,1.50 24.75,1.25 3.75,6.25 1.25,28.75 Z');
 		this.outline.attr({
 			fill: '#000000'
 		});
-		this.inline = this.draw.path('M 60.31,35.60 C 65.28,34.40 82.75,35.00 89.00,35.00 89.00,35.00 146.00,35.00 146.00,35.00 146.00,35.00 328.00,35.00 328.00,35.00 330.30,35.00 334.41,34.62 335.98,36.60 337.23,38.19 337.00,42.01 337.00,44.00 337.00,44.00 337.00,69.00 337.00,69.00 337.00,69.00 337.00,181.00 337.00,181.00 337.00,182.99 337.23,186.81 335.98,188.40 334.63,190.10 331.95,189.96 330.00,190.00 330.00,190.00 311.00,190.00 311.00,190.00 311.00,190.00 226.00,190.00 226.00,190.00 226.00,190.00 67.00,190.00 67.00,190.00 65.01,190.00 61.19,190.23 59.60,188.98 57.07,186.97 58.00,173.58 58.00,170.00 58.00,170.00 58.00,109.00 58.00,109.00 58.00,109.00 58.00,55.00 58.00,55.00 58.00,51.91 57.61,39.34 58.60,37.31 59.34,35.80 59.56,36.24 60.31,35.60 Z');
+		this.inline = this.draw.path('M 31.75,39.25 C 31.75,39.25 31.75,185.75 31.75,185.75 32.00,191.50 37.75,195.75 42.50,195.75 42.50,195.75 308.25,196.00 308.25,196.00 315.75,196.00 320.25,190.50 320.00,186.00 320.00,186.00 320.25,42.50 320.25,42.50 320.50,35.50 317.00,30.00 308.00,29.75 308.00,29.75 41.50,30.50 41.50,30.50 35.75,30.75 31.75,34.50 31.75,39.25 Z');
 		this.inline.attr({
 			fill: '#ffffff',
 			'fill-opacity': 1.0
@@ -30,7 +30,7 @@ class Cell {
 		});
 		this.rect.radius(4);
 		this.text = this.draw.text('---mV');
-		this.text.move(14 * this.zoom, (this.height - 10) * this.zoom).font({
+		this.text.move(8 * this.zoom, (this.height - 10) * this.zoom).font({
 			fill: '#000000',
 			size: 76,
 			family: 'monospace'
@@ -96,6 +96,7 @@ function q(cells) {
 			let voltage = data.b[0] / 100.0;
 			let battmV = data.b[0] * 10;
 			let remPerc = data.b[12];
+			let fetStatus = data.b[13];
 			let current = data.b[1] / 100.0;
 			let power = voltage * current;
 			let remcapacity = data.b[2] / 100.0;
@@ -123,7 +124,17 @@ function q(cells) {
 				cycles + '</span><br /><span>Temperature 0 : ' +
 				temp0 + '&deg;C</span><br /><span>Temperature 1 : ' +
 				temp1 + '&deg;C</span><br /><span>Cell Deviation : ' +
-				(highest - lowest) + 'mV</span>');
+				(highest - lowest) + 'mV</span><br />');
+			if ((fetStatus & 0b1) && $('.s-charge').is(':checked')) {
+				$('.s-charge').prop('checked', false);
+			} else if (!(fetStatus & 0b1) && !$('.s-charge').is(':checked')) {
+				$('.s-charge').prop('checked', true);
+			}
+			if ((fetStatus & 0b10) && $('.s-discharge').is(':checked')) {
+				$('.s-discharge').prop('checked', false);
+			} else if (!(fetStatus & 0b10) && !$('.s-discharge').is(':checked')) {
+				$('.s-discharge').prop('checked', true);
+			}
 			let x = 0;
 			while ((x < cells.length)) {
 				cells[x].setBalancing(cellbalance & (0b1 << x));
@@ -131,12 +142,12 @@ function q(cells) {
 			}
 			setTimeout(function () {
 				q(cells)
-			}, 1200);
+			}, 400);
 		},
 		error: function (xhr, opts, err) {
 			setTimeout(function () {
 				q(cells);
-			}, 1200);
+			}, 400);
 		}
 	});
 }
@@ -167,14 +178,31 @@ function r() {
 			if (!$('._ti_w').val()) {
 				$('._ti_w').val(data.tiav);
 			}
+			$('.mpptdata').html(JSON.stringify(data.mpptData, null, 4));
 			setTimeout(function () {
 				r();
-			}, 2000);
+			}, 400);
 		},
 		error: function (xhr, opts, err) {
 			setTimeout(function () {
 				r();
-			}, 2000);
+			}, 400);
+		}
+	});
+}
+
+
+function fw() {
+	$.ajax({
+		url: 'http://bms.karunadheera.com/fw',
+		type: 'POST',
+		dataType: 'json',
+		data : $.param({'s' : ($('.s-discharge').is(':checked') ? 0 : 1) * 2 + ($('.s-charge').is(':checked') ? 0 : 1)}),
+		success: function (data) {
+			console.log('success');
+		},
+		error: function (xhr, opts, err) {
+			console.log(err);
 		}
 	});
 }
@@ -183,7 +211,7 @@ $(document).ready(function () {
 	let cells = [];
 	let x = 14;
 	while (x-- > 0) {
-		let cell = new Cell(80, 70, 5);
+		let cell = new Cell(67, 54.8, 6.5);
 		cells.push(cell);
 		cell.getDrawing().addTo('cells');
 	}
@@ -192,7 +220,7 @@ $(document).ready(function () {
 	}, 0);
 	setTimeout(function () {
 		r();
-	}, 0);
+	}, 100);
 	$('._ti_w').on('change', function() {
 		$.ajax({
 			url: '/w',
@@ -221,18 +249,10 @@ $(document).ready(function () {
 			}
 		});
 	});
-	$('.s-auto-mppt').on('change', function() {
-		$.ajax({
-			url: '/w',
-			type: 'POST',
-			dataType: 'json',
-			data : $.param({'d' : 9, 'v': $('.s-auto-mppt').is(':checked') ? 1 : 0}),
-			success: function (data) {
-				console.log('success');
-			},
-			error: function (xhr, opts, err) {
-				console.log(err);
-			}
-		});
+	$('.s-discharge').on('change', function() {
+		fw();
+	});
+	$('.s-charge').on('change', function() {
+		fw();
 	});
 });

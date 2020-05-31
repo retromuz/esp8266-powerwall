@@ -42,8 +42,8 @@
 
 #define CMD_WRITE_AUTO_MPPT 9
 
-#define MPPT_STEP 10
-#define MIN_CURRENT_FOR_PWM_INIT 100
+#define MPPT_STEP 5
+#define MIN_CURRENT_FOR_PWM_INIT 30
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,7 +56,8 @@ typedef struct {
 
 typedef struct {
 	MPPTEntry data[3];
-	volatile unsigned int status;
+	unsigned int status;
+	int current;
 } MPPTData;
 
 void setupPins();

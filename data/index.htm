@@ -11,6 +11,10 @@ viewport {
 span {
 	font-size: 22px !important;
 }
+
+body {
+	padding: 8px;
+}
 </style>
 <link rel="stylesheet"
 	href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"></link>
@@ -27,13 +31,26 @@ span {
 	<hr></hr>
 	<h3>Summary</h3>
 	<div class="summary"></div>
+	<div class="switch">
+		<span>Discharge Mos: </span> <label>OFF <input type="checkbox"
+			id="s-discharge" class="s-discharge"> <span class="lever"></span>
+			ON
+		</label>
+	</div>
+	<div class="switch">
+		<span>Charge Mos: </span> <label>OFF <input type="checkbox"
+			id="s-charge" class="s-charge"> <span class="lever"></span>
+			ON
+		</label>
+	</div>
 	<hr></hr>
 	<h3>MPPT Settings</h3>
 	<div class="settings">
 		<div class="switch">
-			<span>Auto: </span>
-			<label>OFF <input type="checkbox" id="s-auto-mppt" class="s-auto-mppt"> <span
-				class="lever"></span> ON</label>
+			<span>Auto: </span> <label>OFF <input type="checkbox"
+				id="s-auto-mppt" class="s-auto-mppt"> <span class="lever"></span>
+				ON
+			</label>
 		</div>
 		<div>
 			<span>PWM: </span><span class="_i_p"></span>
@@ -58,6 +75,12 @@ span {
 			<label><span>Set Target Output ADC: </span><input
 				type="number" class="_to_w" /></label>
 		</div>
+		<div>
+			<pre>
+				<code class="mpptdata"></code>
+			</pre>
+		</div>
+
 	</div>
 </body>
 </html>

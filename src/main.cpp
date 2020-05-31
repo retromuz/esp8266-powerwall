@@ -6,16 +6,16 @@ AsyncWebServer server(80); // Create a webserver object that listens for HTTP re
 Ticker ticker;
 
 volatile unsigned int ticks = 0;
-volatile unsigned long int epochWiFi = 0;
-
-volatile unsigned long int epochMppt = 0;
-volatile unsigned long int epochI2C = 0;
+volatile unsigned long totalTicks = 0;
+volatile unsigned long wifiTick = 0;
+volatile unsigned long mpptTick = 0;
 
 volatile int tiav = 0;
 volatile int iav = 0;
 volatile int toav = 0;
 volatile int oav = 0;
 volatile int pwm = -1;
+volatile int current = 0;
 volatile bool autoMppt = true;
 
 MPPTData mpptData;
@@ -24,10 +24,12 @@ HTTPClient http;
 WiFiClient wifi;
 
 void ISRwatchdog() {
+	totalTicks++;
 	if (++ticks > 30) {
 		Serial.println("watchdog reset");
 		ESP.reset();
 	}
+	readI2CSlave();
 }
 
 void setup(void) {
@@ -41,29 +43,27 @@ void setup(void) {
 		ESP.reset();
 	}
 	if (setupWiFi()) {
-		digitalWrite(WIFI_LED, HIGH);
-		setupWebServer();
-		setupNTPClient();
-		setupOTA();
-		Serial.print("Connected to ");
-		Serial.println(WiFi.SSID());  // Tell us what network we're connected to
-		Serial.print("IP address:\t");
-		Serial.println(WiFi.localIP()); // Send the IP address of the ESP8266 to the computer
 	}
+	digitalWrite(WIFI_LED, HIGH);
+	setupWebServer();
+	setupNTPClient();
+	setupOTA();
+	Serial.print("Connected to ");
+	Serial.println(WiFi.SSID());  // Tell us what network we're connected to
+	Serial.print("IP address:\t");
+	Serial.println(WiFi.localIP()); // Send the IP address of the ESP8266 to the computer
 	Wire.setClock(100000);
 	Wire.begin();
 	initMpptData();
-	epochMppt = timeClient.getEpochTime();
-	epochI2C = timeClient.getEpochTime();
 }
 
 void loop(void) {
 	ticks = 0;
 	ArduinoOTA.handle();
-	if (timeClient.getEpochTime() - epochWiFi > 20) {
+	if (totalTicks - wifiTick > 20) {
 		Serial.println("Checking WiFi connectivity.");
 		Serial.println(WiFi.status());
-		epochWiFi = timeClient.getEpochTime();
+		wifiTick = totalTicks;
 		if (!WiFi.isConnected()) {
 			Serial.println("WiFi reconnecting...");
 			WiFi.disconnect(true);
@@ -71,18 +71,15 @@ void loop(void) {
 			setupWiFi();
 		}
 	}
-	if (WiFi.isConnected() && autoMppt
-			&& timeClient.getEpochTime() - epochMppt > 6) {
-		epochMppt = timeClient.getEpochTime();
+	if (WiFi.isConnected() && autoMppt && totalTicks > mpptTick
+			&& totalTicks - mpptTick > 1) {
+		mpptTick = totalTicks;
 		if (mpptData.status == 3) {
 			analyseMpptData();
 			initMpptData();
 		} else {
 			buildMpptData();
 		}
-	}
-	if (timeClient.getEpochTime() - epochI2C > 1) {
-		readI2CSlave();
 	}
 }
 
@@ -128,7 +125,9 @@ void buildMpptData() {
 	if (http.begin(wifi, "http://bms.karunadheera.com/c")) {
 		int code = http.GET();
 		if (code == 200) {
-			int current = http.getString().toInt();
+			current = http.getString().toInt();
+			Serial.printf("current reading: %d\r\n", current);
+			mpptData.current = current;
 			if (current > MIN_CURRENT_FOR_PWM_INIT) {
 				Wire.beginTransmission(SLAVE_I2C_ADDR);
 				Wire.write(SLAVE_I2C_CMD_READ_TARGET_INPUT_ADC_VAL);
@@ -166,7 +165,6 @@ void analyseMpptData() {
 	if (mpptData.data[0].current >= mpptData.data[1].current) {
 		if (mpptData.data[0].current >= mpptData.data[2].current) {
 			writeAdc(mpptData.data[0].inAdc);
-			epochMppt = timeClient.getEpochTime() + 10;
 			Serial.print(
 					"current MPPT conditions are the best. revert to inADC: ");
 			Serial.println(mpptData.data[0].inAdc);
@@ -271,7 +269,7 @@ void setupWebServer() {
 	});
 	server.on("/r", HTTP_GET, [](AsyncWebServerRequest *request) {
 		char out[280];
-		sprintf(out,"{\"tiav\":%d,\"iav\":%d,\"toav\":%d,\"oav\":%d,\"pwm\":%d,\"autoMppt\":%d}" , tiav, iav, toav, oav, pwm, autoMppt? 1 : 0);
+		sprintf(out,"{\"tiav\":%d,\"iav\":%d,\"toav\":%d,\"oav\":%d,\"pwm\":%d,\"autoMppt\":%d, \"current\":%d,\"mpptData\":{\"status\":%d,\"data\":[{\"inAdc\":%d,\"current\":%d},{\"inAdc\":%d,\"current\":%d},{\"inAdc\":%d,\"current\":%d}]}}" , tiav, iav, toav, oav, pwm, autoMppt? 1 : 0, mpptData.current, mpptData.status, mpptData.data[0].inAdc, mpptData.data[0].current, mpptData.data[1].inAdc, mpptData.data[1].current, mpptData.data[2].inAdc, mpptData.data[2].current);
 		request->send_P(200, CONTENT_TYPE_APPLICATION_JSON, out);
 	});
 	server.on("/w", HTTP_POST, [](AsyncWebServerRequest *request) {
@@ -282,7 +280,6 @@ void setupWebServer() {
 				autoMppt = v->value().toInt();
 			} else if (v && d) {
 				int val = v->value().toInt();
-				Serial.println(val);
 				Wire.beginTransmission(SLAVE_I2C_ADDR);
 				Wire.write(d->value().toInt());
 				Wire.write(val & 0xff);
