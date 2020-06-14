@@ -72,7 +72,7 @@ void loop(void) {
 		}
 	}
 	if (WiFi.isConnected() && autoMppt && totalTicks > mpptTick
-			&& totalTicks - mpptTick > 1) {
+			&& totalTicks - mpptTick > 2) {
 		mpptTick = totalTicks;
 		if (mpptData.status == 3) {
 			analyseMpptData();
@@ -167,6 +167,7 @@ void analyseMpptData() {
 			writeAdc(mpptData.data[0].inAdc);
 			Serial.print(
 					"current MPPT conditions are the best. revert to inADC: ");
+			mpptTick = mpptTick + 60;
 			Serial.println(mpptData.data[0].inAdc);
 		} else {
 			writeAdc(mpptData.data[2].inAdc);
@@ -278,6 +279,9 @@ void setupWebServer() {
 			AsyncWebParameter *v = request->getParam("v", true, false);
 			if (d && v && d->value().toInt() == CMD_WRITE_AUTO_MPPT) {
 				autoMppt = v->value().toInt();
+				if (autoMppt) {
+					mpptTick = 0;
+				}
 			} else if (v && d) {
 				int val = v->value().toInt();
 				Wire.beginTransmission(SLAVE_I2C_ADDR);

@@ -74,13 +74,7 @@ class Cell {
 
 	setBalancing(balancing) {
 		if (this.balancing != balancing) {
-			if (balancing) {
-				this.outline.animate(480, 480, 'now').attr({
-					fill: '#806ef1'
-				}).loop(true, true);
-			} else {
-				this.outline.timeline().stop();
-			}
+			this.outline.fill(balancing ? '#806ef1' : '#000000');
 		}
 		this.balancing = balancing;
 	}
@@ -142,12 +136,12 @@ function q(cells) {
 			}
 			setTimeout(function () {
 				q(cells)
-			}, 400);
+			}, 4000);
 		},
 		error: function (xhr, opts, err) {
 			setTimeout(function () {
 				q(cells);
-			}, 400);
+			}, 4000);
 		}
 	});
 }
@@ -181,12 +175,12 @@ function r() {
 			$('.mpptdata').html(JSON.stringify(data.mpptData, null, 4));
 			setTimeout(function () {
 				r();
-			}, 400);
+			}, 4000);
 		},
 		error: function (xhr, opts, err) {
 			setTimeout(function () {
 				r();
-			}, 400);
+			}, 4000);
 		}
 	});
 }
@@ -198,6 +192,21 @@ function fw() {
 		type: 'POST',
 		dataType: 'json',
 		data : $.param({'s' : ($('.s-discharge').is(':checked') ? 0 : 1) * 2 + ($('.s-charge').is(':checked') ? 0 : 1)}),
+		success: function (data) {
+			console.log('success');
+		},
+		error: function (xhr, opts, err) {
+			console.log(err);
+		}
+	});
+}
+
+function w() {
+	$.ajax({
+		url: '/w',
+		type: 'POST',
+		dataType: 'json',
+		data : $.param({'v' : $('.s-auto-mppt').is(':checked') ? 1 : 0, 'd' : 9}),
 		success: function (data) {
 			console.log('success');
 		},
@@ -220,7 +229,7 @@ $(document).ready(function () {
 	}, 0);
 	setTimeout(function () {
 		r();
-	}, 100);
+	}, 0);
 	$('._ti_w').on('change', function() {
 		$.ajax({
 			url: '/w',
@@ -254,5 +263,8 @@ $(document).ready(function () {
 	});
 	$('.s-charge').on('change', function() {
 		fw();
+	});
+	$('.s-auto-mppt').on('change', function() {
+		w();
 	});
 });

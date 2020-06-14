@@ -42,7 +42,7 @@
 
 #define CMD_WRITE_AUTO_MPPT 9
 
-#define MPPT_STEP 5
+#define MPPT_STEP 8
 #define MIN_CURRENT_FOR_PWM_INIT 30
 
 #ifdef __cplusplus
