@@ -68,8 +68,8 @@ class Cell {
 			let cellVRel = cellV - 3400;
 			let battCellVRel = (battmV / 14) - 3400;
 			this.setStateContinuous(parseInt(267 * remPerc * cellVRel / battCellVRel / 100));
-			this.text.tspan(cellV + 'mV');
 		}
+		this.text.tspan(cellV + 'mV');
 	}
 
 	setBalancing(balancing) {
@@ -160,27 +160,28 @@ function r() {
 				el.prop('checked', false);
 			}
 			$('._i_p').text(data.pwm - 0 == 255 ? -1 : data.pwm);
-			let V = ((data.oav - 0.0000) * 0.105714286);
-			$('._o_r').text(data.oav + ' (' + V.toFixed(2) + 'V)');
-			V = ((data.iav - 0.0000) * 0.071875);
+			let V = ((data.iav - 0.0000) * 0.07147465437);
 			$('._i_r').text(data.iav + ' (' + V.toFixed(2) + 'V)');
-			$('._to_r').text(data.toav);
-			if (!$('._to_w').val()) {
-				$('._to_w').val(data.toav);
-			}
+			V = ((data.oav - 0.0000) * 0.138823529);
+			$('._o_r').text(data.oav + ' (' + V.toFixed(2) + 'V)');
+			$('._o_c_r').text(data.ocav);
 			$('._ti_r').text(data.tiav);
 			if (!$('._ti_w').val()) {
 				$('._ti_w').val(data.tiav);
 			}
+			$('._to_r').text(data.toav);
+			if (!$('._to_w').val()) {
+				$('._to_w').val(data.toav);
+			}
 			$('.mpptdata').html(JSON.stringify(data.mpptData, null, 4));
 			setTimeout(function () {
 				r();
-			}, 4000);
+			}, 250);
 		},
 		error: function (xhr, opts, err) {
 			setTimeout(function () {
 				r();
-			}, 4000);
+			}, 250);
 		}
 	});
 }
@@ -188,7 +189,7 @@ function r() {
 
 function fw() {
 	$.ajax({
-		url: 'http://bms.karunadheera.com/fw',
+		url: 'http://bms.karunadheera.com/w',
 		type: 'POST',
 		dataType: 'json',
 		data : $.param({'s' : ($('.s-discharge').is(':checked') ? 0 : 1) * 2 + ($('.s-charge').is(':checked') ? 0 : 1)}),

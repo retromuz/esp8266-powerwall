@@ -16,8 +16,6 @@
 #include <Ticker.h>
 #include <SoftwareSerial.h>
 #include <WiFiClient.h>
-#include <WiFiUdp.h>
-#include <NTPClient.h>
 #include <ArduinoOTA.h>
 #include <Wire.h>
 #include <ESP8266HTTPClient.h>
@@ -37,13 +35,13 @@
 #define SLAVE_I2C_CMD_READ_INPUT_ADC_VAL 2
 #define SLAVE_I2C_CMD_READ_OUTPUT_ADC_VAL 3
 #define SLAVE_I2C_CMD_READ_PWM_VAL 6
-#define SLAVE_I2C_CMD_WRITE_FREQ 7
 #define SLAVE_I2C_CMD_READ_FREQ 8
+#define SLAVE_I2C_CMD_READ_OUTPUT_CURRENT_ADC_VAL 10
 
 #define CMD_WRITE_AUTO_MPPT 9
 
-#define MPPT_STEP 8
-#define MIN_CURRENT_FOR_PWM_INIT 30
+#define MPPT_STEP 5
+#define MIN_CURRENT_FOR_PWM_INIT -1
 
 #ifdef __cplusplus
 extern "C" {
@@ -63,13 +61,14 @@ typedef struct {
 void setupPins();
 void initMpptData();
 void buildMpptData();
+//void readBMS();
 void analyseMpptData();
 void readI2CSlave();
 void writeAdc(int adc);
 bool setupWiFi();
 void setupWebServer();
-void notFound(AsyncWebServerRequest *request);
-void setupNTPClient();
+//void notFound(AsyncWebServerRequest *request);
+//void setupNTPClient();
 void setupOTA();
 void handleRoot();
 String readProperty(String props, String key);

@@ -1,7 +1,5 @@
 #include "main.h"
 
-WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP);
 AsyncWebServer server(80); // Create a webserver object that listens for HTTP request on port 80
 Ticker ticker;
 
@@ -14,6 +12,7 @@ volatile int tiav = 0;
 volatile int iav = 0;
 volatile int toav = 0;
 volatile int oav = 0;
+volatile int ocav = 0;
 volatile int pwm = -1;
 volatile int current = 0;
 volatile bool autoMppt = true;
@@ -27,26 +26,27 @@ void ISRwatchdog() {
 	totalTicks++;
 	if (++ticks > 30) {
 		Serial.println("watchdog reset");
+		ticks = 0;
 		ESP.reset();
 	}
 	readI2CSlave();
 }
 
 void setup(void) {
-	Serial.begin(115200);
 	delay(100);
+	Serial.begin(115200);
 	Serial.println("Starting");
-	ticker.attach(1, ISRwatchdog);
+	ticker.attach_ms(333, ISRwatchdog);
 	setupPins();
 	if (!LittleFS.begin()) {
 		Serial.println("Error setting up LittleFS!");
+		ticks = 0;
 		ESP.reset();
 	}
 	if (setupWiFi()) {
 	}
 	digitalWrite(WIFI_LED, HIGH);
 	setupWebServer();
-	setupNTPClient();
 	setupOTA();
 	Serial.print("Connected to ");
 	Serial.println(WiFi.SSID());  // Tell us what network we're connected to
@@ -65,10 +65,8 @@ void loop(void) {
 		Serial.println(WiFi.status());
 		wifiTick = totalTicks;
 		if (!WiFi.isConnected()) {
-			Serial.println("WiFi reconnecting...");
-			WiFi.disconnect(true);
-			delay(500);
-			setupWiFi();
+			ticks = 0;
+			ESP.reset();
 		}
 	}
 	if (WiFi.isConnected() && autoMppt && totalTicks > mpptTick
@@ -119,46 +117,37 @@ void readI2CSlave() {
 	if (Wire.requestFrom(SLAVE_I2C_ADDR, 1)) {
 		pwm = Wire.read();
 	}
+	Wire.beginTransmission(SLAVE_I2C_ADDR);
+	Wire.write(SLAVE_I2C_CMD_READ_OUTPUT_CURRENT_ADC_VAL);
+	Wire.endTransmission();
+	if (Wire.requestFrom(SLAVE_I2C_ADDR, 2)) {
+		Wire.readBytes(buf, 2);
+		ocav = buf[0] | buf[1] << 8;
+	}
 }
 
 void buildMpptData() {
-	if (http.begin(wifi, "http://bms.karunadheera.com/c")) {
-		int code = http.GET();
-		if (code == 200) {
-			current = http.getString().toInt();
-			Serial.printf("current reading: %d\r\n", current);
-			mpptData.current = current;
-			if (current > MIN_CURRENT_FOR_PWM_INIT) {
-				Wire.beginTransmission(SLAVE_I2C_ADDR);
-				Wire.write(SLAVE_I2C_CMD_READ_TARGET_INPUT_ADC_VAL);
-				Wire.endTransmission();
-				if (Wire.requestFrom(SLAVE_I2C_ADDR, 2)) {
-					uint8_t buf[2];
-					Wire.readBytes(buf, 2);
-					int adc = buf[0] | buf[1] << 8;
-					MPPTEntry e;
-					e.current = current;
-					e.inAdc = adc;
-					mpptData.data[mpptData.status++] = e;
-					if (mpptData.status == 1) {
-						adc = adc + MPPT_STEP;
-						writeAdc(adc);
-					} else if (mpptData.status == 2) {
-						adc = adc - (MPPT_STEP * 2);
-						writeAdc(adc);
-					}
-				}
-			} else {
-				initMpptData();
-			}
-		} else {
-			Serial.print("error http code: ");
-			Serial.println(code);
+	mpptData.current = ocav;
+	Wire.beginTransmission(SLAVE_I2C_ADDR);
+	Wire.write(SLAVE_I2C_CMD_READ_TARGET_INPUT_ADC_VAL);
+	Wire.endTransmission();
+	if (Wire.requestFrom(SLAVE_I2C_ADDR, 2)) {
+		uint8_t buf[2];
+		Wire.readBytes(buf, 2);
+		int adc = buf[0] | buf[1] << 8;
+		MPPTEntry e;
+		e.current = ocav;
+		e.inAdc = adc;
+		mpptData.data[mpptData.status++] = e;
+		if (mpptData.status == 1) {
+			adc = adc + MPPT_STEP;
+			writeAdc(adc);
+		} else if (mpptData.status == 2) {
+			adc = adc - (MPPT_STEP * 2);
+			writeAdc(adc);
 		}
-		http.end();
-	} else {
-		Serial.println("cannot read bms.karunadheera.com/c");
 	}
+
 }
 
 void analyseMpptData() {
@@ -167,7 +156,6 @@ void analyseMpptData() {
 			writeAdc(mpptData.data[0].inAdc);
 			Serial.print(
 					"current MPPT conditions are the best. revert to inADC: ");
-			mpptTick = mpptTick + 60;
 			Serial.println(mpptData.data[0].inAdc);
 		} else {
 			writeAdc(mpptData.data[2].inAdc);
@@ -239,6 +227,8 @@ bool setupWiFi() {
 					ssid.c_str(), password.c_str());
 			Serial.printf("Wi-Fi mode set to WIFI_STA %s\r\n",
 					WiFi.mode(WIFI_STA) ? "" : "Failed!");
+
+			WiFi.softAPdisconnect(true);
 			WiFi.begin(ssid, password);
 
 			Serial.printf("Connecting");
@@ -270,7 +260,7 @@ void setupWebServer() {
 	});
 	server.on("/r", HTTP_GET, [](AsyncWebServerRequest *request) {
 		char out[280];
-		sprintf(out,"{\"tiav\":%d,\"iav\":%d,\"toav\":%d,\"oav\":%d,\"pwm\":%d,\"autoMppt\":%d, \"current\":%d,\"mpptData\":{\"status\":%d,\"data\":[{\"inAdc\":%d,\"current\":%d},{\"inAdc\":%d,\"current\":%d},{\"inAdc\":%d,\"current\":%d}]}}" , tiav, iav, toav, oav, pwm, autoMppt? 1 : 0, mpptData.current, mpptData.status, mpptData.data[0].inAdc, mpptData.data[0].current, mpptData.data[1].inAdc, mpptData.data[1].current, mpptData.data[2].inAdc, mpptData.data[2].current);
+		sprintf(out,"{\"tiav\":%d,\"iav\":%d,\"toav\":%d,\"oav\":%d,\"ocav\":%d,\"pwm\":%d,\"autoMppt\":%d, \"current\":%d,\"mpptData\":{\"status\":%d,\"data\":[{\"inAdc\":%d,\"current\":%d},{\"inAdc\":%d,\"current\":%d},{\"inAdc\":%d,\"current\":%d}]}}" , tiav, iav, toav, oav, ocav, pwm, autoMppt? 1 : 0, mpptData.current, mpptData.status, mpptData.data[0].inAdc, mpptData.data[0].current, mpptData.data[1].inAdc, mpptData.data[1].current, mpptData.data[2].inAdc, mpptData.data[2].current);
 		request->send_P(200, CONTENT_TYPE_APPLICATION_JSON, out);
 	});
 	server.on("/w", HTTP_POST, [](AsyncWebServerRequest *request) {
@@ -299,25 +289,25 @@ void setupWebServer() {
 		}
 	});
 
-	server.onNotFound(notFound);
+//	server.onNotFound(notFound);
 
 	server.begin();
 	Serial.println("HTTP server started");
 }
 
-void notFound(AsyncWebServerRequest *request) {
-	request->send(LittleFS, "/index.htm");
-}
+//void notFound(AsyncWebServerRequest *request) {
+//	request->send(LittleFS, "/index.htm");
+//}
 
-void setupNTPClient() {
-	Serial.println("Synchronizing time with NTP");
-	timeClient.begin();
-	timeClient.setTimeOffset(39600);
-	while (!timeClient.update()) {
-		timeClient.forceUpdate();
-	}
-	Serial.println(timeClient.getFormattedDate());
-}
+//void setupNTPClient() {
+//	Serial.println("Synchronizing time with NTP");
+//	timeClient.begin();
+//	timeClient.setTimeOffset(39600);
+//	while (!timeClient.update()) {
+//		timeClient.forceUpdate();
+//	}
+//	Serial.println(timeClient.getFormattedDate());
+//}
 
 void setupOTA() {
 
@@ -328,6 +318,7 @@ void setupOTA() {
 	});
 	ArduinoOTA.onEnd([]() {
 		Serial.println("\nEnd");
+		ticks = 0;
 	});
 	ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
 		Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
