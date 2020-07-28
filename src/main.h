@@ -59,16 +59,14 @@ typedef struct {
 } MPPTData;
 
 void setupPins();
-void initMpptData();
+void mppt();
 void buildMpptData();
-//void readBMS();
 void analyseMpptData();
 void readI2CSlave();
 void writeAdc(int adc);
 bool setupWiFi();
 void setupWebServer();
 //void notFound(AsyncWebServerRequest *request);
-//void setupNTPClient();
 void setupOTA();
 void handleRoot();
 String readProperty(String props, String key);

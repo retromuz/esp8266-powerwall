@@ -13,8 +13,8 @@ volatile int iav = 0;
 volatile int toav = 0;
 volatile int oav = 0;
 volatile int ocav = 0;
+volatile int ocav_tmp = 0;
 volatile int pwm = -1;
-volatile int current = 0;
 volatile bool autoMppt = true;
 
 MPPTData mpptData;
@@ -54,7 +54,7 @@ void setup(void) {
 	Serial.println(WiFi.localIP()); // Send the IP address of the ESP8266 to the computer
 	Wire.setClock(100000);
 	Wire.begin();
-	initMpptData();
+	mpptData.status = 0;
 }
 
 void loop(void) {
@@ -69,14 +69,69 @@ void loop(void) {
 			ESP.reset();
 		}
 	}
-	if (WiFi.isConnected() && autoMppt && totalTicks > mpptTick
-			&& totalTicks - mpptTick > 2) {
+
+	mppt();
+}
+
+void mppt() {
+	if (autoMppt && totalTicks > mpptTick && totalTicks - mpptTick > 2) {
 		mpptTick = totalTicks;
 		if (mpptData.status == 3) {
 			analyseMpptData();
-			initMpptData();
+			mpptData.status = 0;
 		} else {
 			buildMpptData();
+		}
+	}
+}
+
+void buildMpptData() {
+	mpptData.current = ocav;
+	Wire.beginTransmission(SLAVE_I2C_ADDR);
+	Wire.write(SLAVE_I2C_CMD_READ_TARGET_INPUT_ADC_VAL);
+	Wire.endTransmission();
+	if (Wire.requestFrom(SLAVE_I2C_ADDR, 2)) {
+		uint8_t buf[2];
+		Wire.readBytes(buf, 2);
+		int adc = buf[0] | buf[1] << 8;
+		MPPTEntry e;
+		e.current = ocav;
+		e.inAdc = adc;
+		mpptData.data[mpptData.status++] = e;
+		if (mpptData.status == 1) {
+			adc = adc + MPPT_STEP;
+			writeAdc(adc);
+		} else if (mpptData.status == 2) {
+			adc = adc - (MPPT_STEP * 2);
+			writeAdc(adc);
+		}
+	}
+
+}
+
+void analyseMpptData() {
+	ocav_tmp = 0;
+	if (mpptData.data[0].current >= mpptData.data[1].current) {
+		if (mpptData.data[0].current >= mpptData.data[2].current) {
+			writeAdc(mpptData.data[0].inAdc);
+			ocav_tmp = ocav;
+			Serial.print(
+					"current MPPT conditions are the best. revert to inADC: ");
+			Serial.println(mpptData.data[0].inAdc);
+		} else {
+			writeAdc(mpptData.data[2].inAdc);
+			Serial.print("found better MPPT conditions at inADC: ");
+			Serial.println(mpptData.data[2].inAdc);
+		}
+	} else {
+		if (mpptData.data[1].current >= mpptData.data[2].current) {
+			writeAdc(mpptData.data[1].inAdc);
+			Serial.print("found better MPPT conditions at inADC: ");
+			Serial.println(mpptData.data[1].inAdc);
+		} else {
+			writeAdc(mpptData.data[2].inAdc);
+			Serial.print("found better MPPT conditions at inADC: ");
+			Serial.println(mpptData.data[2].inAdc);
 		}
 	}
 }
@@ -126,65 +181,12 @@ void readI2CSlave() {
 	}
 }
 
-void buildMpptData() {
-	mpptData.current = ocav;
-	Wire.beginTransmission(SLAVE_I2C_ADDR);
-	Wire.write(SLAVE_I2C_CMD_READ_TARGET_INPUT_ADC_VAL);
-	Wire.endTransmission();
-	if (Wire.requestFrom(SLAVE_I2C_ADDR, 2)) {
-		uint8_t buf[2];
-		Wire.readBytes(buf, 2);
-		int adc = buf[0] | buf[1] << 8;
-		MPPTEntry e;
-		e.current = ocav;
-		e.inAdc = adc;
-		mpptData.data[mpptData.status++] = e;
-		if (mpptData.status == 1) {
-			adc = adc + MPPT_STEP;
-			writeAdc(adc);
-		} else if (mpptData.status == 2) {
-			adc = adc - (MPPT_STEP * 2);
-			writeAdc(adc);
-		}
-	}
-
-}
-
-void analyseMpptData() {
-	if (mpptData.data[0].current >= mpptData.data[1].current) {
-		if (mpptData.data[0].current >= mpptData.data[2].current) {
-			writeAdc(mpptData.data[0].inAdc);
-			Serial.print(
-					"current MPPT conditions are the best. revert to inADC: ");
-			Serial.println(mpptData.data[0].inAdc);
-		} else {
-			writeAdc(mpptData.data[2].inAdc);
-			Serial.print("found better MPPT conditions at inADC: ");
-			Serial.println(mpptData.data[2].inAdc);
-		}
-	} else {
-		if (mpptData.data[1].current >= mpptData.data[2].current) {
-			writeAdc(mpptData.data[1].inAdc);
-			Serial.print("found better MPPT conditions at inADC: ");
-			Serial.println(mpptData.data[1].inAdc);
-		} else {
-			writeAdc(mpptData.data[2].inAdc);
-			Serial.print("found better MPPT conditions at inADC: ");
-			Serial.println(mpptData.data[2].inAdc);
-		}
-	}
-}
-
 void writeAdc(int adc) {
 	Wire.beginTransmission(SLAVE_I2C_ADDR);
 	Wire.write(SLAVE_I2C_CMD_WRITE_TARGET_INPUT_ADC_VAL);
 	Wire.write(adc & 0xff);
 	Wire.write((adc & 0xff00) >> 8);
 	Wire.endTransmission();
-}
-
-void initMpptData() {
-	mpptData.status = 0;
 }
 
 void setupPins() {
@@ -299,16 +301,6 @@ void setupWebServer() {
 //	request->send(LittleFS, "/index.htm");
 //}
 
-//void setupNTPClient() {
-//	Serial.println("Synchronizing time with NTP");
-//	timeClient.begin();
-//	timeClient.setTimeOffset(39600);
-//	while (!timeClient.update()) {
-//		timeClient.forceUpdate();
-//	}
-//	Serial.println(timeClient.getFormattedDate());
-//}
-
 void setupOTA() {
 
 	Serial.println("Setting up OTA");
@@ -319,6 +311,7 @@ void setupOTA() {
 	ArduinoOTA.onEnd([]() {
 		Serial.println("\nEnd");
 		ticks = 0;
+		ESP.reset();
 	});
 	ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
 		Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
