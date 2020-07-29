@@ -176,12 +176,12 @@ function r() {
 			$('.mpptdata').html(JSON.stringify(data.mpptData, null, 4));
 			setTimeout(function () {
 				r();
-			}, 250);
+			}, 4000);
 		},
 		error: function (xhr, opts, err) {
 			setTimeout(function () {
 				r();
-			}, 250);
+			}, 4000);
 		}
 	});
 }
