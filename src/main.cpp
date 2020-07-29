@@ -36,7 +36,7 @@ void setup(void) {
 	delay(100);
 	Serial.begin(115200);
 	Serial.println("Starting");
-	ticker.attach_ms(333, ISRwatchdog);
+	ticker.attach_ms(4000, ISRwatchdog);
 	setupPins();
 	if (!LittleFS.begin()) {
 		Serial.println("Error setting up LittleFS!");
