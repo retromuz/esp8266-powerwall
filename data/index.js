@@ -83,22 +83,21 @@ class Cell {
 
 function q(cells) {
 	$.ajax({
-		url: 'http://bms.karunadheera.com/r',
+		url: 'http://10.0.0.36/r',
 		type: 'GET',
 		dataType: 'json',
 		success: function (data) {
-			let voltage = data.b[0] / 100.0;
-			let battmV = data.b[0] * 10;
-			let remPerc = data.b[12];
-			let fetStatus = data.b[13];
-			let current = data.b[1] / 100.0;
+			let voltage = data.b.v / 100.0;
+			let battmV = data.b.v * 10;
+			let remPerc = data.b.remPerc;
+			let fetStatus = data.b.fets;
+			let current = data.b.c / 100.0;
 			let power = voltage * current;
-			let remcapacity = data.b[2] / 100.0;
-			let nomcapacity = data.b[3] / 100.0;
-			let cycles = data.b[4];
-			let cellbalance = data.b[6].toString(2);
-			let temp0 = ((data.b[16] - 2731) / 10.0).toFixed(1);
-			let temp1 = ((data.b[17] - 2731) / 10.0).toFixed(1);
+			let remcapacity = data.b.remCap / 100.0;
+			let nomcapacity = data.b.tC / 100.0;
+			let cycles = data.b.nCyc;
+			let temp0 = ((data.b.ntc0 - 2731) / 10.0).toFixed(1);
+			let temp1 = ((data.b.ntc1 - 2731) / 10.0).toFixed(1);
 			let datav = data.v;
 			let lowest = datav.reduce((prev, curr) => {
 				return prev < curr ? prev : curr;
@@ -118,7 +117,7 @@ function q(cells) {
 				cycles + '</span><br /><span>Temperature 0 : ' +
 				temp0 + '&deg;C</span><br /><span>Temperature 1 : ' +
 				temp1 + '&deg;C</span><br /><span>Cell Deviation : ' +
-				(highest - lowest) + 'mV</span><br />');
+				(highest - lowest) + 'mV</span>');
 			if ((fetStatus & 0b1) && $('.s-charge').is(':checked')) {
 				$('.s-charge').prop('checked', false);
 			} else if (!(fetStatus & 0b1) && !$('.s-charge').is(':checked')) {
@@ -130,10 +129,6 @@ function q(cells) {
 				$('.s-discharge').prop('checked', true);
 			}
 			let x = 0;
-			while ((x < cells.length)) {
-				cells[x].setBalancing(cellbalance & (0b1 << x));
-				x++;
-			}
 			setTimeout(function () {
 				q(cells)
 			}, 4000);
@@ -162,10 +157,11 @@ function r() {
 			$('._i_p').text(data.pwm - 0 == 255 ? -1 : data.pwm);
 			let V = ((data.iav - 0.0000) * 0.07147465437);
 			$('._i_r').text(data.iav + ' (' + V.toFixed(2) + 'V)');
-			V = ((data.oav - 0.0000) * 0.138823529);
-			$('._o_r').text(data.oav + ' (' + V.toFixed(2) + 'V)');
+			V = ((data.oav - 0.0000) * 0.14);
+			$('._o_r').text(data.oav + ' (' + V.toFixed(2) + 'V, ' + (V/14.0).toFixed(2) + 'V/cell)');
 			$('._o_c_r').text(data.ocav);
 			$('._ti_r').text(data.tiav);
+
 			if (!$('._ti_w').val()) {
 				$('._ti_w').val(data.tiav);
 			}
@@ -173,7 +169,9 @@ function r() {
 			if (!$('._to_w').val()) {
 				$('._to_w').val(data.toav);
 			}
-			$('.mpptdata').html(JSON.stringify(data.mpptData, null, 4));
+			$('._ice_r').text((data.ic / 1000) + 'A');
+			$('._oce_r').text((data.oc / 1000) + 'A');
+			$('._ope_r').text((V * (data.oc / 1000)).toFixed(2) + 'W');
 			setTimeout(function () {
 				r();
 			}, 4000);
@@ -185,7 +183,6 @@ function r() {
 		}
 	});
 }
-
 
 function fw() {
 	$.ajax({
@@ -193,21 +190,6 @@ function fw() {
 		type: 'POST',
 		dataType: 'json',
 		data : $.param({'s' : ($('.s-discharge').is(':checked') ? 0 : 1) * 2 + ($('.s-charge').is(':checked') ? 0 : 1)}),
-		success: function (data) {
-			console.log('success');
-		},
-		error: function (xhr, opts, err) {
-			console.log(err);
-		}
-	});
-}
-
-function w() {
-	$.ajax({
-		url: '/w',
-		type: 'POST',
-		dataType: 'json',
-		data : $.param({'v' : $('.s-auto-mppt').is(':checked') ? 1 : 0, 'd' : 9}),
 		success: function (data) {
 			console.log('success');
 		},
@@ -266,6 +248,18 @@ $(document).ready(function () {
 		fw();
 	});
 	$('.s-auto-mppt').on('change', function() {
-		w();
+		$.ajax({
+			url: '/w',
+			type: 'POST',
+			dataType: 'json',
+			data : $.param({'d' : 14, 'v': $('.s-auto-mppt').is(':checked') ? 0 : 1}),
+			success: function (data) {
+				console.log('success');
+			},
+			error: function (xhr, opts, err) {
+				console.log(err);
+			}
+		});
 	});
+	
 });

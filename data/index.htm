@@ -16,35 +16,30 @@ body {
 	padding: 8px;
 }
 </style>
-<link rel="stylesheet"
-	href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"></link>
-<script
-	src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
-<script
-	src="https://cdnjs.cloudflare.com/ajax/libs/svg.js/3.0.16/svg.min.js"
-	integrity="sha256-MCvBrhCuX8GNt0gmv06kZ4jGIi1R2QNaSkadjRzinFs="
-	crossorigin="anonymous"></script>
+<link rel="stylesheet" href="/materialize.min.css"></link>
+<script src="/jquery.min.js"></script>
+<script src="/svg.min.js"></script>
 <script src="/index.js"></script>
 </head>
 <body>
-	<cells></cells>
-	<hr></hr>
-	<h3>Summary</h3>
-	<div class="summary"></div>
-	<div class="switch">
-		<span>Discharge Mos: </span> <label>OFF <input type="checkbox"
-			id="s-discharge" class="s-discharge"> <span class="lever"></span>
-			ON
-		</label>
+	<div class="bms">
+		<cells></cells>
+		<hr></hr>
+		<div class="summary"></div>
+		<div class="switch">
+			<span>Discharge Mos: </span> <label>OFF <input type="checkbox"
+				id="s-discharge" class="s-discharge"> <span class="lever"></span>
+				ON
+			</label>
+		</div>
+		<div class="switch">
+			<span>Charge Mos: </span> <label>OFF <input type="checkbox"
+				id="s-charge" class="s-charge"> <span class="lever"></span>
+				ON
+			</label>
+		</div>
+		<hr></hr>
 	</div>
-	<div class="switch">
-		<span>Charge Mos: </span> <label>OFF <input type="checkbox"
-			id="s-charge" class="s-charge"> <span class="lever"></span>
-			ON
-		</label>
-	</div>
-	<hr></hr>
-	<h3>MPPT Settings</h3>
 	<div class="settings">
 		<div class="switch">
 			<span>Auto: </span> <label>OFF <input type="checkbox"
@@ -59,6 +54,9 @@ body {
 			<span>Input ADC: </span><span class="_i_r"></span>
 		</div>
 		<div>
+			<span>Input current (estimate): </span><span class="_ice_r"></span>
+		</div>
+		<div>
 			<span>Target Input ADC: </span><span class="_ti_r"></span>
 		</div>
 		<div>
@@ -69,7 +67,10 @@ body {
 			<span>Output ADC: </span><span class="_o_r"></span>
 		</div>
 		<div>
-			<span>Output Current ADC: </span><span class="_o_c_r"></span>
+			<span>Output Current (estimate): </span><span class="_oce_r"></span>
+		</div>
+		<div>
+			<span>Output Power (estimate): </span><span class="_ope_r"></span>
 		</div>
 		<div>
 			<span>Target Output ADC: </span><span class="_to_r"></span>
@@ -79,9 +80,7 @@ body {
 				type="number" class="_to_w" /></label>
 		</div>
 		<div>
-			<pre>
-				<code class="mpptdata"></code>
-			</pre>
+			<span>Output Current ADC: </span><span class="_o_c_r"></span>
 		</div>
 
 	</div>

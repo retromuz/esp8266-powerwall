@@ -5,3 +5,4 @@
 .project
 .travis.yml
 data/firmware.properties
+build
