@@ -1,4 +1,4 @@
-A web based battery monitoring amd solar MPPT charging system
+A web based battery monitoring and solar MPPT charging system
 =
 This project is to be used along with below two projects.
 1. https://github.com/retromuz/atmega328p-powerwall.git
