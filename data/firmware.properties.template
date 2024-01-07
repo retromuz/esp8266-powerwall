@@ -1,0 +1,6 @@
+wifi.ssid=ssid
+wifi.password=password
+mqtt.id=id
+mqtt.user=user
+mqtt.pass=pass
+mqtt.topic=path/id

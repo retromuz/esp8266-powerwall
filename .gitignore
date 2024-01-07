@@ -5,4 +5,10 @@
 .project
 .travis.yml
 data/firmware.properties
-build
+platformio.ini
+
+remote_upload
+remote_uploadfs
+sync_repo
+upload
+uploadfs

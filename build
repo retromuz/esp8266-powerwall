@@ -1,0 +1,4 @@
+#!/bin/bash
+~/.platformio/penv/bin/platformio run -t clean
+~/.platformio/penv/bin/platformio run
+mklittlefs -c data -p 256 -b 8192 -s 1024000 .pio/build/esp8266-powerwall/littlefs.bin
